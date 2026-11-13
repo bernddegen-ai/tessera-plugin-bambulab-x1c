@@ -66,11 +66,11 @@ class PrinterStatusTile : public tessera::Tile {
     lv_obj_set_style_text_align(progress_label_, LV_TEXT_ALIGN_RIGHT, 0);
 
     // Info row: layer / time remaining
-    info_label_ = ui::label(c.parent, Font::CAPTION, theme::MUTED);
+    info_label_ = ui::label(c.parent, Font::BODY, theme::MUTED);
     lv_obj_set_width(info_label_, width_);
 
     // Temps row (nozzle / bed / chamber)
-    temps_label_ = ui::label(c.parent, Font::CAPTION, theme::MUTED);
+    temps_label_ = ui::label(c.parent, Font::BODY, theme::MUTED);
     lv_obj_set_width(temps_label_, width_);
 
     layout();
@@ -162,7 +162,7 @@ class PrinterStatusTile : public tessera::Tile {
  private:
   void layout() {
     int line_h = ui::line_height(Font::BODY);
-    int cap_h  = ui::line_height(Font::CAPTION);
+    int cap_h  = ui::line_height(Font::BODY);
     int bar_h  = 8;
     int gap    = 4;
 
