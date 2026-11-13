@@ -57,10 +57,13 @@ class PrinterStatusTile : public tessera::Tile {
 
     int pad = 4;
     arc_size_ = height_ - 2 * pad;
-    int info_x = pad + arc_size_ + 8;
-    int info_w = width_ - info_x - pad;
+    // compact mode when there's not enough horizontal space for arc + info
+    compact_ = (width_ < arc_size_ + 40);
 
-    // Circular progress arc
+    int info_x = compact_ ? 0 : (pad + arc_size_ + 8);
+    int info_w = compact_ ? width_ : (width_ - info_x - pad);
+
+    // Circular progress arc (hidden in compact mode)
     arc_ = lv_arc_create(c.parent);
     lv_obj_set_size(arc_, arc_size_, arc_size_);
     lv_obj_set_pos(arc_, pad, pad);
@@ -75,8 +78,9 @@ class PrinterStatusTile : public tessera::Tile {
     lv_obj_set_style_bg_opa(arc_, LV_OPA_TRANSP, LV_PART_KNOB);
     lv_obj_set_style_pad_all(arc_, 0, LV_PART_KNOB);
     lv_obj_clear_flag(arc_, LV_OBJ_FLAG_CLICKABLE);
+    if (compact_) lv_obj_add_flag(arc_, LV_OBJ_FLAG_HIDDEN);
 
-    // Percentage label centered over arc
+    // Percentage label — centered over arc in normal mode, top of tile in compact
     pct_label_ = ui::label(c.parent, Font::BODY, theme::INK);
     lv_obj_set_style_text_align(pct_label_, LV_TEXT_ALIGN_CENTER, 0);
 
@@ -154,33 +158,45 @@ class PrinterStatusTile : public tessera::Tile {
     int pad = 4;
     int lh  = ui::line_height(Font::BODY);
     int gap = 4;
-    int total = 3 * lh + 2 * gap;
-    int y = (height_ - total) / 2;
 
-    // Arc — vertically centered
-    lv_obj_set_pos(arc_, pad, (height_ - arc_size_) / 2);
+    if (compact_) {
+      // compact 1×1: pct big, status below, no arc, no info/temps
+      int total = 2 * lh + gap;
+      int y = (height_ - total) / 2;
+      lv_obj_set_width(pct_label_, width_);
+      lv_obj_set_pos(pct_label_, 0, y);
+      lv_obj_set_width(status_label_, width_);
+      lv_obj_set_pos(status_label_, 0, y + lh + gap);
+      lv_obj_set_height(status_label_, lh);
+      lv_obj_add_flag(info_label_, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_add_flag(temps_label_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      int total = 3 * lh + 2 * gap;
+      int y = (height_ - total) / 2;
 
-    // Percentage centered on arc
-    lv_obj_set_width(pct_label_, arc_size_);
-    lv_obj_set_pos(pct_label_, pad, (height_ - lh) / 2);
+      lv_obj_set_pos(arc_, pad, (height_ - arc_size_) / 2);
 
-    // Info rows
-    lv_obj_set_pos(status_label_, info_x_, y);
-    lv_obj_set_height(status_label_, lh);
-    lv_obj_set_width(status_label_, info_w_);
+      lv_obj_set_width(pct_label_, arc_size_);
+      lv_obj_set_pos(pct_label_, pad, (height_ - lh) / 2);
 
-    lv_obj_set_pos(info_label_, info_x_, y + lh + gap);
-    lv_obj_set_height(info_label_, lh);
-    lv_obj_set_width(info_label_, info_w_);
+      lv_obj_set_pos(status_label_, info_x_, y);
+      lv_obj_set_height(status_label_, lh);
+      lv_obj_set_width(status_label_, info_w_);
 
-    lv_obj_set_pos(temps_label_, info_x_, y + 2 * (lh + gap));
-    lv_obj_set_height(temps_label_, lh);
-    lv_obj_set_width(temps_label_, info_w_);
+      lv_obj_set_pos(info_label_, info_x_, y + lh + gap);
+      lv_obj_set_height(info_label_, lh);
+      lv_obj_set_width(info_label_, info_w_);
+
+      lv_obj_set_pos(temps_label_, info_x_, y + 2 * (lh + gap));
+      lv_obj_set_height(temps_label_, lh);
+      lv_obj_set_width(temps_label_, info_w_);
+    }
   }
 
   BambulabX1C *plugin_;
   int width_{0}, height_{0};
   int arc_size_{0}, info_x_{0}, info_w_{0};
+  bool compact_{false};
 
   lv_obj_t *arc_{};
   lv_obj_t *pct_label_{};

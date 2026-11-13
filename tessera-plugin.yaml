@@ -1,5 +1,5 @@
 id: bambulab_x1c
-version: 0.2.0
+version: 0.3.0
 api: "0.15"
 icon: printer-3d
 maintainer: bernddegen
@@ -21,7 +21,7 @@ tiles:
   - id: printer_status
     name: tile_printer_status_name
     icon: printer-3d
-    sizes: { min: 2x1, max: 4x2 }
+    sizes: { min: 1x1, max: 4x2 }
     memory: 1500
     example: tile_printer_status_example
 
