@@ -1,0 +1,37 @@
+{
+  "_meta": { "name": "Deutsch" },
+  "screen": {
+    "no_data": "Keine Daten",
+    "nozzle": "Düse",
+    "bed": "Bett",
+    "chamber": "Kammer",
+    "layer": "Schicht",
+    "remaining": "Verbleibend"
+  },
+  "app": {
+    "name": "Bambulab X1C",
+    "summary": "Zeigt Status und Temperaturen eines Bambulab X1C 3D-Druckers.",
+    "tile_printer_status_name": "Drucker-Status",
+    "tile_printer_status_example": "Druckt 73% · noch 1h 12m",
+    "tile_printer_temps_name": "Drucker-Temperaturen",
+    "tile_printer_temps_example": "Düse 220° · Bett 65°",
+    "opt_print_status": "Druckstatus",
+    "opt_print_status_hint": "Sensor für den aktuellen Druckzustand (z. B. Druckt, Bereit).",
+    "opt_progress": "Fortschritt",
+    "opt_progress_hint": "Sensor für den Druckfortschritt in Prozent (0–100).",
+    "opt_layer": "Aktuelle Schicht",
+    "opt_layer_hint": "Sensor für die aktuelle Schichtnummer.",
+    "opt_time_remaining": "Verbleibende Zeit",
+    "opt_time_remaining_hint": "Sensor für die verbleibende Druckzeit in Minuten.",
+    "opt_nozzle_temp": "Düsentemperatur",
+    "opt_nozzle_temp_hint": "Sensor für die Düsentemperatur in °C.",
+    "opt_bed_temp": "Betttemperatur",
+    "opt_bed_temp_hint": "Sensor für die Temperatur des Heizbetts in °C.",
+    "opt_chamber_temp": "Kammertemperatur",
+    "opt_chamber_temp_hint": "Sensor für die Kammertemperatur in °C.",
+    "opt_total_layers": "Gesamtzahl Schichten",
+    "opt_total_layers_hint": "Sensor für die Gesamtzahl der Schichten im Druckauftrag.",
+    "opt_job_name": "Auftragsname",
+    "opt_job_name_hint": "Sensor für den Namen des aktuellen Druckauftrags (Name der Aufgabe)."
+  }
+}
