@@ -1,12 +1,21 @@
 {
-  "_meta": { "name": "English" },
+  "_meta": {
+    "name": "English"
+  },
   "screen": {
-    "no_data": "No data",
     "nozzle": "Nozzle",
     "bed": "Bed",
     "chamber": "Chamber",
     "layer": "Layer",
-    "remaining": "Remaining"
+    "remaining": "{t} left",
+    "temps": "TEMPS",
+    "st_running": "PRINTING",
+    "st_prepare": "PREPARING",
+    "st_paused": "PAUSED",
+    "st_failed": "ERROR",
+    "st_finished": "FINISHED",
+    "st_idle": "READY",
+    "st_offline": "OFFLINE"
   },
   "app": {
     "name": "Bambulab X1C",

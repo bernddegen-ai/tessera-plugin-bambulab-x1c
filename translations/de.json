@@ -1,12 +1,21 @@
 {
-  "_meta": { "name": "Deutsch" },
+  "_meta": {
+    "name": "Deutsch"
+  },
   "screen": {
-    "no_data": "Keine Daten",
     "nozzle": "Düse",
     "bed": "Bett",
     "chamber": "Kammer",
     "layer": "Schicht",
-    "remaining": "Verbleibend"
+    "remaining": "noch {t}",
+    "temps": "TEMPS",
+    "st_running": "DRUCKT",
+    "st_prepare": "VORBEREITUNG",
+    "st_paused": "PAUSIERT",
+    "st_failed": "FEHLER",
+    "st_finished": "FERTIG",
+    "st_idle": "BEREIT",
+    "st_offline": "OFFLINE"
   },
   "app": {
     "name": "Bambulab X1C",

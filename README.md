@@ -6,7 +6,7 @@ Shows the live status and temperatures of a **Bambulab X1C** 3D printer on a Tes
 
 | Tile | Sizes | Shows |
 |---|---|---|
-| Printer status | 2×1 – 4×2 | Status text, progress bar, layer, time remaining, all three temperatures |
+| Printer status | 1×1 – 4×2 | Progress ring, status, job name, layer, time remaining, all three temperatures; what does not fit a small tile gives way |
 | Printer temperatures | 1×1 – 2×2 | Nozzle / bed / chamber temperatures |
 
 ## Setup
