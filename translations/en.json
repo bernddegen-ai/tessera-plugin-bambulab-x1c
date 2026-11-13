@@ -11,27 +11,11 @@
   "app": {
     "name": "Bambulab X1C",
     "summary": "Shows the status and temperatures of a Bambulab X1C 3D printer.",
+    "drucker_prefix": "Device prefix",
+    "drucker_prefix_hint": "The device ID of your printer — e.g. x1c_00m09d481700483. All matching entities will be linked automatically.",
     "tile_printer_status_name": "Printer status",
     "tile_printer_status_example": "Printing 73% · 1h 12m left",
     "tile_printer_temps_name": "Printer temperatures",
-    "tile_printer_temps_example": "Nozzle 220° · Bed 65°",
-    "opt_print_status": "Print status",
-    "opt_print_status_hint": "The sensor that shows the current print state (e.g. Printing, Idle).",
-    "opt_progress": "Progress",
-    "opt_progress_hint": "The sensor that shows the print progress in percent (0–100).",
-    "opt_layer": "Current layer",
-    "opt_layer_hint": "The sensor that shows the current layer number.",
-    "opt_time_remaining": "Time remaining",
-    "opt_time_remaining_hint": "The sensor that shows the remaining print time in minutes.",
-    "opt_nozzle_temp": "Nozzle temperature",
-    "opt_nozzle_temp_hint": "The sensor for the nozzle temperature in °C.",
-    "opt_bed_temp": "Bed temperature",
-    "opt_bed_temp_hint": "The sensor for the heated bed temperature in °C.",
-    "opt_chamber_temp": "Chamber temperature",
-    "opt_chamber_temp_hint": "The sensor for the chamber temperature in °C.",
-    "opt_total_layers": "Total layers",
-    "opt_total_layers_hint": "The sensor that shows the total number of layers in the print job.",
-    "opt_job_name": "Job name",
-    "opt_job_name_hint": "The sensor that shows the name of the current print job (task name)."
+    "tile_printer_temps_example": "Nozzle 220° · Bed 65°"
   }
 }

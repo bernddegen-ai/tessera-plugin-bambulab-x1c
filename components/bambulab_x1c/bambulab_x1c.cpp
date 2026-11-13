@@ -1,7 +1,8 @@
 #include "bambulab_x1c.h"
 #include <cstdio>
+#include <cstring>
 #include <string>
-#include <cmath>
+#include <cctype>
 
 namespace esphome::bambulab_x1c {
 
@@ -22,186 +23,168 @@ static std::string format_minutes(int minutes) {
   return buf;
 }
 
-static std::string format_temp(const char *state) {
-  if (!state || !*state) return "--";
-  float v = atof(state);
+static std::string format_temp(const std::string &s) {
+  if (s.empty() || s == "unavailable") return "--";
+  float v = atof(s.c_str());
   char buf[16];
   snprintf(buf, sizeof(buf), "%.0f°", v);
   return buf;
 }
 
-static int parse_int(const char *state) {
-  if (!state || !*state) return -1;
-  return atoi(state);
+static lv_color_t status_color(const std::string &status) {
+  std::string s = status;
+  for (auto &c : s) c = (char)tolower((unsigned char)c);
+  if (s.find("print") != std::string::npos || s.find("druckt") != std::string::npos)
+    return lv_color_hex(0x22d3ee);
+  if (s.find("paus") != std::string::npos)
+    return lv_color_hex(0xeab308);
+  if (s.find("fail") != std::string::npos || s.find("fehler") != std::string::npos ||
+      s.find("error") != std::string::npos)
+    return lv_color_hex(0xef4444);
+  return lv_color_hex(0x94a3b8);
 }
 
 // ─── PrinterStatusTile ─────────────────────────────────────────────────────
-// 2x1 to 4x2: shows print status, progress bar, layer, time remaining, temps.
+// 2x1 to 4x2: circular arc progress on the left, status info on the right.
 
 class PrinterStatusTile : public tessera::Tile {
  public:
-  explicit PrinterStatusTile(const tessera::Plugin *plugin) : plugin_(plugin) {}
+  explicit PrinterStatusTile(BambulabX1C *plugin) : plugin_(plugin) {}
 
   void create(const tessera::TileContext &c) override {
     width_ = c.width;
     height_ = c.height;
 
-    // Title row: printer icon + status text
+    int pad = 4;
+    arc_size_ = height_ - 2 * pad;
+    int info_x = pad + arc_size_ + 8;
+    int info_w = width_ - info_x - pad;
+
+    // Circular progress arc
+    arc_ = lv_arc_create(c.parent);
+    lv_obj_set_size(arc_, arc_size_, arc_size_);
+    lv_obj_set_pos(arc_, pad, pad);
+    lv_arc_set_range(arc_, 0, 100);
+    lv_arc_set_value(arc_, 0);
+    lv_arc_set_bg_angles(arc_, 135, 45);
+    lv_arc_set_mode(arc_, LV_ARC_MODE_NORMAL);
+    lv_obj_set_style_arc_color(arc_, lv_color_hex(0x1e293b), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(arc_, lv_color_hex(0x94a3b8), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(arc_, 6, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(arc_, 6, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(arc_, LV_OPA_TRANSP, LV_PART_KNOB);
+    lv_obj_set_style_pad_all(arc_, 0, LV_PART_KNOB);
+    lv_obj_clear_flag(arc_, LV_OBJ_FLAG_CLICKABLE);
+
+    // Percentage label centered over arc
+    pct_label_ = ui::label(c.parent, Font::BODY, theme::INK);
+    lv_obj_set_style_text_align(pct_label_, LV_TEXT_ALIGN_CENTER, 0);
+
+    // Status + job name
     status_label_ = ui::label(c.parent, Font::BODY, theme::INK);
-    lv_obj_set_width(status_label_, width_);
+    lv_obj_set_width(status_label_, info_w);
 
-    // Progress bar (LVGL native)
-    progress_bar_ = lv_bar_create(c.parent);
-    lv_obj_set_size(progress_bar_, width_, 8);
-    lv_bar_set_range(progress_bar_, 0, 100);
-    lv_bar_set_value(progress_bar_, 0, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(progress_bar_, lv_color_hex(0x334155), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(progress_bar_, lv_color_hex(0x22d3ee), LV_PART_INDICATOR);
-    lv_obj_set_style_radius(progress_bar_, 4, LV_PART_MAIN);
-    lv_obj_set_style_radius(progress_bar_, 4, LV_PART_INDICATOR);
-
-    // Progress percentage
-    progress_label_ = ui::label(c.parent, Font::BODY, theme::ACCENT);
-    lv_obj_set_width(progress_label_, width_);
-    lv_obj_set_style_text_align(progress_label_, LV_TEXT_ALIGN_RIGHT, 0);
-
-    // Info row: layer / time remaining
+    // Layer / time remaining
     info_label_ = ui::label(c.parent, Font::BODY, theme::MUTED);
-    lv_obj_set_width(info_label_, width_);
+    lv_obj_set_width(info_label_, info_w);
 
-    // Temps row (nozzle / bed / chamber)
+    // Temperatures
     temps_label_ = ui::label(c.parent, Font::BODY, theme::MUTED);
-    lv_obj_set_width(temps_label_, width_);
+    lv_obj_set_width(temps_label_, info_w);
 
+    info_x_ = info_x;
+    info_w_ = info_w;
     layout();
   }
 
-  void on_state(JsonObjectConst data) override {
-    // entity option data arrives under "entities"
-    JsonObjectConst entities = data["entities"];
+  void on_tick(uint32_t) override {
+    int pv = (plugin_->progress_val >= 0 && plugin_->progress_val <= 100) ? plugin_->progress_val : 0;
+    lv_arc_set_value(arc_, pv);
 
-    auto get_state = [&](const char *key) -> const char * {
-      if (!entities[key].isNull()) {
-        const char *s = entities[key]["state"] | "";
-        return s;
-      }
-      return "";
-    };
-
-    status_text_ = get_state("entity_print_status");
-    progress_val_ = parse_int(get_state("entity_progress"));
-
-    const char *layer     = get_state("entity_layer");
-    const char *total_lay = get_state("entity_total_layers");
-    if (*layer && *total_lay && atoi(total_lay) > 0)
-      layer_text_ = std::string(layer) + "/" + total_lay;
-    else if (*layer)
-      layer_text_ = layer;
-    else
-      layer_text_ = "";
-
-    const char *jn = get_state("entity_job_name");
-    job_name_ = (*jn && std::string(jn) != "unavailable") ? jn : "";
-
-    time_remaining_ = parse_int(get_state("entity_time_remaining"));
-    nozzle_temp_ = get_state("entity_nozzle_temp");
-    bed_temp_ = get_state("entity_bed_temp");
-    chamber_temp_ = get_state("entity_chamber_temp");
-  }
-
-  void on_tick(uint32_t /*epoch*/) override {
-    // Job name as subtitle, or status if no job name
-    std::string headline = status_text_.empty() ? plugin_->text("no_data") : status_text_;
-    if (!job_name_.empty()) headline += "  ·  " + job_name_;
-    ui::set_text(status_label_, headline);
-
-    // Progress bar
-    int pv = (progress_val_ >= 0 && progress_val_ <= 100) ? progress_val_ : 0;
-    lv_bar_set_value(progress_bar_, pv, LV_ANIM_OFF);
+    lv_color_t col = status_color(plugin_->print_status);
+    lv_obj_set_style_arc_color(arc_, col, LV_PART_INDICATOR);
 
     char pct[8];
     snprintf(pct, sizeof(pct), "%d%%", pv);
-    ui::set_text(progress_label_, pct);
+    ui::set_text(pct_label_, pct);
 
-    // Info: layer + time
+    // Status line
+    std::string stat = plugin_->print_status.empty() ? plugin_->text("no_data") : plugin_->print_status;
+    if (!plugin_->job_name.empty()) stat += "  ·  " + plugin_->job_name;
+    ui::set_text(status_label_, stat);
+    lv_obj_set_style_text_color(status_label_, col, 0);
+
+    // Layer + time
     std::string info;
-    if (!layer_text_.empty() && layer_text_ != "unavailable") {
-      info += plugin_->text("layer") + std::string(": ") + layer_text_;
+    if (plugin_->layer_val >= 0) {
+      info = plugin_->text("layer") + ": " + std::to_string(plugin_->layer_val);
+      if (plugin_->total_layers_val > 0)
+        info += "/" + std::to_string(plugin_->total_layers_val);
     }
-    if (time_remaining_ > 0) {
+    if (plugin_->time_remaining > 0) {
       if (!info.empty()) info += "  ";
-      info += plugin_->text("remaining") + std::string(": ") + format_minutes(time_remaining_);
+      info += plugin_->text("remaining") + ": " + format_minutes(plugin_->time_remaining);
     }
     ui::set_text(info_label_, info);
 
     // Temps
     std::string temps;
-    if (*nozzle_temp_) temps += plugin_->text("nozzle") + std::string(" ") + format_temp(nozzle_temp_);
-    if (*bed_temp_) {
+    auto add_temp = [&](const std::string &label_key, const std::string &val) {
+      if (val.empty() || val == "unavailable") return;
       if (!temps.empty()) temps += "  ";
-      temps += plugin_->text("bed") + std::string(" ") + format_temp(bed_temp_);
-    }
-    if (*chamber_temp_) {
-      if (!temps.empty()) temps += "  ";
-      temps += plugin_->text("chamber") + std::string(" ") + format_temp(chamber_temp_);
-    }
+      temps += plugin_->text(label_key) + " " + format_temp(val);
+    };
+    add_temp("nozzle", plugin_->nozzle_temp);
+    add_temp("bed",    plugin_->bed_temp);
+    add_temp("chamber",plugin_->chamber_temp);
     ui::set_text(temps_label_, temps);
 
     layout();
   }
 
   void on_theme() override {
-    ui::set_color(status_label_, theme::INK);
-    ui::set_color(progress_label_, theme::ACCENT);
+    lv_obj_set_style_arc_color(arc_, lv_color_hex(0x1e293b), LV_PART_MAIN);
     ui::set_color(info_label_, theme::MUTED);
     ui::set_color(temps_label_, theme::MUTED);
-    lv_obj_set_style_bg_color(progress_bar_, lv_color_hex(0x334155), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(progress_bar_, lv_color_hex(0x22d3ee), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(arc_, status_color(plugin_->print_status), LV_PART_INDICATOR);
   }
 
  private:
   void layout() {
-    int line_h = ui::line_height(Font::BODY);
-    int cap_h  = ui::line_height(Font::BODY);
-    int bar_h  = 8;
-    int gap    = 4;
-
-    int total = line_h + gap + bar_h + gap + cap_h + gap + cap_h;
+    int pad = 4;
+    int lh  = ui::line_height(Font::BODY);
+    int gap = 4;
+    int total = 3 * lh + 2 * gap;
     int y = (height_ - total) / 2;
 
-    lv_obj_set_pos(status_label_, 0, y);
-    lv_obj_set_height(status_label_, line_h);
-    y += line_h + gap;
+    // Arc — vertically centered
+    lv_obj_set_pos(arc_, pad, (height_ - arc_size_) / 2);
 
-    lv_obj_set_pos(progress_bar_, 0, y);
-    // progress_label_ overlaps bar (right-aligned)
-    lv_obj_set_pos(progress_label_, 0, y - cap_h);
-    lv_obj_set_height(progress_label_, cap_h);
-    y += bar_h + gap;
+    // Percentage centered on arc
+    lv_obj_set_width(pct_label_, arc_size_);
+    lv_obj_set_pos(pct_label_, pad, (height_ - lh) / 2);
 
-    lv_obj_set_pos(info_label_, 0, y);
-    lv_obj_set_height(info_label_, cap_h);
-    y += cap_h + gap;
+    // Info rows
+    lv_obj_set_pos(status_label_, info_x_, y);
+    lv_obj_set_height(status_label_, lh);
+    lv_obj_set_width(status_label_, info_w_);
 
-    lv_obj_set_pos(temps_label_, 0, y);
-    lv_obj_set_height(temps_label_, cap_h);
+    lv_obj_set_pos(info_label_, info_x_, y + lh + gap);
+    lv_obj_set_height(info_label_, lh);
+    lv_obj_set_width(info_label_, info_w_);
+
+    lv_obj_set_pos(temps_label_, info_x_, y + 2 * (lh + gap));
+    lv_obj_set_height(temps_label_, lh);
+    lv_obj_set_width(temps_label_, info_w_);
   }
 
-  const tessera::Plugin *plugin_;
-  int width_ = 0, height_ = 0;
+  BambulabX1C *plugin_;
+  int width_{0}, height_{0};
+  int arc_size_{0}, info_x_{0}, info_w_{0};
 
-  std::string status_text_;
-  std::string job_name_;
-  int progress_val_ = 0;
-  std::string layer_text_;
-  int time_remaining_ = -1;
-  const char *nozzle_temp_ = "";
-  const char *bed_temp_    = "";
-  const char *chamber_temp_ = "";
-
+  lv_obj_t *arc_{};
+  lv_obj_t *pct_label_{};
   lv_obj_t *status_label_{};
-  lv_obj_t *progress_bar_{};
-  lv_obj_t *progress_label_{};
   lv_obj_t *info_label_{};
   lv_obj_t *temps_label_{};
 };
@@ -211,7 +194,7 @@ class PrinterStatusTile : public tessera::Tile {
 
 class PrinterTempsTile : public tessera::Tile {
  public:
-  explicit PrinterTempsTile(const tessera::Plugin *plugin) : plugin_(plugin) {}
+  explicit PrinterTempsTile(BambulabX1C *plugin) : plugin_(plugin) {}
 
   void create(const tessera::TileContext &c) override {
     width_ = c.width;
@@ -222,20 +205,10 @@ class PrinterTempsTile : public tessera::Tile {
     }
   }
 
-  void on_state(JsonObjectConst data) override {
-    JsonObjectConst entities = data["entities"];
-    auto get = [&](const char *key) -> const char * {
-      return entities[key].isNull() ? "" : (entities[key]["state"] | "");
-    };
-    nozzle_ = get("entity_nozzle_temp");
-    bed_    = get("entity_bed_temp");
-    chamber_= get("entity_chamber_temp");
-  }
-
-  void on_tick(uint32_t /*epoch*/) override {
-    ui::set_text(labels_[0], plugin_->text("nozzle") + std::string(": ") + format_temp(nozzle_));
-    ui::set_text(labels_[1], plugin_->text("bed")    + std::string(": ") + format_temp(bed_));
-    ui::set_text(labels_[2], plugin_->text("chamber")+ std::string(": ") + format_temp(chamber_));
+  void on_tick(uint32_t) override {
+    ui::set_text(labels_[0], plugin_->text("nozzle")  + ": " + format_temp(plugin_->nozzle_temp));
+    ui::set_text(labels_[1], plugin_->text("bed")     + ": " + format_temp(plugin_->bed_temp));
+    ui::set_text(labels_[2], plugin_->text("chamber") + ": " + format_temp(plugin_->chamber_temp));
 
     int lh = ui::line_height(Font::BODY);
     int gap = 6;
@@ -254,17 +227,24 @@ class PrinterTempsTile : public tessera::Tile {
   }
 
  private:
-  const tessera::Plugin *plugin_;
-  int width_ = 0, height_ = 0;
-  const char *nozzle_  = "";
-  const char *bed_     = "";
-  const char *chamber_ = "";
+  BambulabX1C *plugin_;
+  int width_{0}, height_{0};
   lv_obj_t *labels_[3]{};
 };
 
 // ─── Plugin setup ──────────────────────────────────────────────────────────
 
 void BambulabX1C::setup() {
+  subscribe_homeassistant_state(&BambulabX1C::on_print_status,   prefix_ + "_druckstatus");
+  subscribe_homeassistant_state(&BambulabX1C::on_progress,       prefix_ + "_druckfortschritt");
+  subscribe_homeassistant_state(&BambulabX1C::on_layer,          prefix_ + "_aktuelle_schicht");
+  subscribe_homeassistant_state(&BambulabX1C::on_total_layers,   prefix_ + "_gesamtzahl_der_schichten");
+  subscribe_homeassistant_state(&BambulabX1C::on_time_remaining, prefix_ + "_verbleibende_zeit");
+  subscribe_homeassistant_state(&BambulabX1C::on_job_name,       prefix_ + "_name_der_aufgabe");
+  subscribe_homeassistant_state(&BambulabX1C::on_nozzle,         prefix_ + "_temperatur_der_duse");
+  subscribe_homeassistant_state(&BambulabX1C::on_bed,            prefix_ + "_druckbetttemperatur");
+  subscribe_homeassistant_state(&BambulabX1C::on_chamber,        prefix_ + "_temperatur_im_druckraum");
+
   add_tile("printer_status", [this]() { return new PrinterStatusTile(this); });
   add_tile("printer_temps",  [this]() { return new PrinterTempsTile(this); });
 }

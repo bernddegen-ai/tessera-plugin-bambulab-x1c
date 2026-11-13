@@ -1,3 +1,5 @@
-# Tessera includes this file from the screen's <name>.plugins.yaml and adds this plugin's
-# components/ folder as an ESPHome external component.
 bambulab_x1c:
+  prefix: "sensor.${PREFIX}"
+
+defaults:
+  PREFIX: x1c_00m09d481700483

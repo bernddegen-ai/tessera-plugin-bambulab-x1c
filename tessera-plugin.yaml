@@ -1,5 +1,5 @@
 id: bambulab_x1c
-version: 0.1.0
+version: 0.2.0
 api: "0.15"
 icon: printer-3d
 maintainer: bernddegen
@@ -11,59 +11,19 @@ requires:
 boards: any
 flash_kb: 8
 
+inputs:
+  - id: prefix
+    kind: text
+    label: drucker_prefix
+    hint: drucker_prefix_hint
+
 tiles:
   - id: printer_status
     name: tile_printer_status_name
     icon: printer-3d
     sizes: { min: 2x1, max: 4x2 }
-    memory: 1200
+    memory: 1500
     example: tile_printer_status_example
-    options:
-      - id: entity_print_status
-        kind: entity
-        domains: [sensor]
-        label: opt_print_status
-        hint: opt_print_status_hint
-      - id: entity_progress
-        kind: entity
-        domains: [sensor]
-        label: opt_progress
-        hint: opt_progress_hint
-      - id: entity_layer
-        kind: entity
-        domains: [sensor]
-        label: opt_layer
-        hint: opt_layer_hint
-      - id: entity_time_remaining
-        kind: entity
-        domains: [sensor]
-        label: opt_time_remaining
-        hint: opt_time_remaining_hint
-      - id: entity_nozzle_temp
-        kind: entity
-        domains: [sensor]
-        label: opt_nozzle_temp
-        hint: opt_nozzle_temp_hint
-      - id: entity_bed_temp
-        kind: entity
-        domains: [sensor]
-        label: opt_bed_temp
-        hint: opt_bed_temp_hint
-      - id: entity_chamber_temp
-        kind: entity
-        domains: [sensor]
-        label: opt_chamber_temp
-        hint: opt_chamber_temp_hint
-      - id: entity_total_layers
-        kind: entity
-        domains: [sensor]
-        label: opt_total_layers
-        hint: opt_total_layers_hint
-      - id: entity_job_name
-        kind: entity
-        domains: [sensor]
-        label: opt_job_name
-        hint: opt_job_name_hint
 
   - id: printer_temps
     name: tile_printer_temps_name
@@ -71,19 +31,3 @@ tiles:
     sizes: { min: 1x1, max: 2x2 }
     memory: 600
     example: tile_printer_temps_example
-    options:
-      - id: entity_nozzle_temp
-        kind: entity
-        domains: [sensor]
-        label: opt_nozzle_temp
-        hint: opt_nozzle_temp_hint
-      - id: entity_bed_temp
-        kind: entity
-        domains: [sensor]
-        label: opt_bed_temp
-        hint: opt_bed_temp_hint
-      - id: entity_chamber_temp
-        kind: entity
-        domains: [sensor]
-        label: opt_chamber_temp
-        hint: opt_chamber_temp_hint
