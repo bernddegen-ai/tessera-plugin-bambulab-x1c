@@ -1,5 +1,8 @@
 bambulab_x1c:
   prefix: "sensor.${PREFIX}"
 
+api:
+  homeassistant_states: true
+
 defaults:
   PREFIX: x1c_00m09d481700483

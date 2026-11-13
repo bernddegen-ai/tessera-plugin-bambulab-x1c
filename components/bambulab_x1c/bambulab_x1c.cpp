@@ -117,22 +117,22 @@ class PrinterStatusTile : public tessera::Tile {
     // Layer + time
     std::string info;
     if (plugin_->layer_val >= 0) {
-      info = plugin_->text("layer") + ": " + std::to_string(plugin_->layer_val);
+      info = std::string(plugin_->text("layer")) + ": " + std::to_string(plugin_->layer_val);
       if (plugin_->total_layers_val > 0)
         info += "/" + std::to_string(plugin_->total_layers_val);
     }
     if (plugin_->time_remaining > 0) {
       if (!info.empty()) info += "  ";
-      info += plugin_->text("remaining") + ": " + format_minutes(plugin_->time_remaining);
+      info += std::string(plugin_->text("remaining")) + ": " + format_minutes(plugin_->time_remaining);
     }
     ui::set_text(info_label_, info);
 
     // Temps
     std::string temps;
-    auto add_temp = [&](const std::string &label_key, const std::string &val) {
+    auto add_temp = [&](const char *label_key, const std::string &val) {
       if (val.empty() || val == "unavailable") return;
       if (!temps.empty()) temps += "  ";
-      temps += plugin_->text(label_key) + " " + format_temp(val);
+      temps += std::string(plugin_->text(label_key)) + " " + format_temp(val);
     };
     add_temp("nozzle", plugin_->nozzle_temp);
     add_temp("bed",    plugin_->bed_temp);
@@ -206,9 +206,9 @@ class PrinterTempsTile : public tessera::Tile {
   }
 
   void on_tick(uint32_t) override {
-    ui::set_text(labels_[0], plugin_->text("nozzle")  + ": " + format_temp(plugin_->nozzle_temp));
-    ui::set_text(labels_[1], plugin_->text("bed")     + ": " + format_temp(plugin_->bed_temp));
-    ui::set_text(labels_[2], plugin_->text("chamber") + ": " + format_temp(plugin_->chamber_temp));
+    ui::set_text(labels_[0], std::string(plugin_->text("nozzle"))   + ": " + format_temp(plugin_->nozzle_temp));
+    ui::set_text(labels_[1], std::string(plugin_->text("bed"))     + ": " + format_temp(plugin_->bed_temp));
+    ui::set_text(labels_[2], std::string(plugin_->text("chamber")) + ": " + format_temp(plugin_->chamber_temp));
 
     int lh = ui::line_height(Font::BODY);
     int gap = 6;
