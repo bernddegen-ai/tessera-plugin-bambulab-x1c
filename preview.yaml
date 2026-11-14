@@ -1,0 +1,14 @@
+tiles:
+  - tile: printer_status
+  - tile: printer_temps
+
+states:
+  sensor.x1c_00m09d481700483_druckstatus: { state: "running" }
+  sensor.x1c_00m09d481700483_druckfortschritt: { state: "73", attributes: { unit_of_measurement: "%" } }
+  sensor.x1c_00m09d481700483_aktuelle_schicht: { state: "92" }
+  sensor.x1c_00m09d481700483_gesamtzahl_der_schichten: { state: "126" }
+  sensor.x1c_00m09d481700483_verbleibende_zeit: { state: "72", attributes: { unit_of_measurement: "min" } }
+  sensor.x1c_00m09d481700483_name_der_aufgabe: { state: "benchy_v3_final.gcode" }
+  sensor.x1c_00m09d481700483_temperatur_der_duse: { state: "221" }
+  sensor.x1c_00m09d481700483_druckbetttemperatur: { state: "65" }
+  sensor.x1c_00m09d481700483_temperatur_im_druckraum: { state: "32" }

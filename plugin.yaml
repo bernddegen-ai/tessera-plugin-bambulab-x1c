@@ -1,8 +1,58 @@
-bambulab_x1c:
-  prefix: "sensor.${PREFIX}"
-
-api:
-  homeassistant_states: true
-
+# What a screen gets when it takes this plugin: the printer's sensors, read straight from Home Assistant.
 defaults:
   PREFIX: x1c_00m09d481700483
+
+text_sensor:
+  - platform: homeassistant
+    id: bambu_status
+    entity_id: sensor.${PREFIX}_druckstatus
+    internal: true
+  - platform: homeassistant
+    id: bambu_progress
+    entity_id: sensor.${PREFIX}_druckfortschritt
+    internal: true
+  - platform: homeassistant
+    id: bambu_layer
+    entity_id: sensor.${PREFIX}_aktuelle_schicht
+    internal: true
+  - platform: homeassistant
+    id: bambu_total_layers
+    entity_id: sensor.${PREFIX}_gesamtzahl_der_schichten
+    internal: true
+  - platform: homeassistant
+    id: bambu_time_left
+    entity_id: sensor.${PREFIX}_verbleibende_zeit
+    internal: true
+  - platform: homeassistant
+    id: bambu_time_unit
+    entity_id: sensor.${PREFIX}_verbleibende_zeit
+    attribute: unit_of_measurement
+    internal: true
+  - platform: homeassistant
+    id: bambu_job
+    entity_id: sensor.${PREFIX}_name_der_aufgabe
+    internal: true
+  - platform: homeassistant
+    id: bambu_nozzle
+    entity_id: sensor.${PREFIX}_temperatur_der_duse
+    internal: true
+  - platform: homeassistant
+    id: bambu_bed
+    entity_id: sensor.${PREFIX}_druckbetttemperatur
+    internal: true
+  - platform: homeassistant
+    id: bambu_chamber
+    entity_id: sensor.${PREFIX}_temperatur_im_druckraum
+    internal: true
+
+bambulab_x1c:
+  status: bambu_status
+  progress: bambu_progress
+  layer: bambu_layer
+  total_layers: bambu_total_layers
+  time_left: bambu_time_left
+  time_unit: bambu_time_unit
+  job: bambu_job
+  nozzle: bambu_nozzle
+  bed: bambu_bed
+  chamber: bambu_chamber

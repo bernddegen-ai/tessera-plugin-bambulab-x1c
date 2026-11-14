@@ -13,23 +13,26 @@ namespace ui = tessera::ui;
 namespace {
 
 // The tiles keep their own dark look in the screen's light and dark theme, like Tessera's media card.
-constexpr uint32_t C_GROUND = 0x0F1117;
-constexpr uint32_t C_TRACK  = 0x1E2433;
-constexpr uint32_t C_CHIP   = 0x1C2130;
-constexpr uint32_t C_LINE   = 0x232838;
-constexpr uint32_t C_INK    = 0xFFFFFF;
-constexpr uint32_t C_MUTED  = 0x8B93A7;
-constexpr uint32_t C_COOL   = 0xA3B1CC;
-constexpr uint32_t C_HOT    = 0xFB923C;
-constexpr uint32_t C_CYAN   = 0x22D3EE;
-constexpr uint32_t C_YELLOW = 0xEAB308;
-constexpr uint32_t C_RED    = 0xEF4444;
-constexpr uint32_t C_GREEN  = 0x22C55E;
-constexpr uint32_t C_IDLE   = 0x64748B;
+struct Rgb {
+  uint8_t r, g, b;
+};
+constexpr Rgb C_GROUND{15, 17, 23};
+constexpr Rgb C_TRACK{30, 36, 51};
+constexpr Rgb C_CHIP{28, 33, 48};
+constexpr Rgb C_LINE{35, 40, 56};
+constexpr Rgb C_INK{255, 255, 255};
+constexpr Rgb C_MUTED{139, 147, 167};
+constexpr Rgb C_COOL{163, 177, 204};
+constexpr Rgb C_HOT{251, 146, 60};
+constexpr Rgb C_CYAN{34, 211, 238};
+constexpr Rgb C_YELLOW{234, 179, 8};
+constexpr Rgb C_RED{239, 68, 68};
+constexpr Rgb C_GREEN{34, 197, 94};
+constexpr Rgb C_IDLE{100, 116, 139};
 
 constexpr float HOT_FROM = 45.0f;
 
-lv_color_t col(uint32_t hex) { return lv_color_hex(hex); }
+lv_color_t col(Rgb c) { return lv_color_make(c.r, c.g, c.b); }
 
 enum class State : uint8_t { OFFLINE, IDLE, PREPARE, RUNNING, PAUSED, FINISHED, FAILED };
 
@@ -46,7 +49,7 @@ State parse_state(const std::string &raw) {
   return State::OFFLINE;
 }
 
-uint32_t state_color(State s) {
+Rgb state_color(State s) {
   switch (s) {
     case State::RUNNING:
     case State::PREPARE: return C_CYAN;
@@ -83,9 +86,9 @@ std::string format_temp(const std::string &s) {
   return buf;
 }
 
-uint32_t temp_color(const std::string &s) { return (!s.empty() && atof(s.c_str()) >= HOT_FROM) ? C_HOT : C_COOL; }
+Rgb temp_color(const std::string &s) { return (!s.empty() && atof(s.c_str()) >= HOT_FROM) ? C_HOT : C_COOL; }
 
-lv_obj_t *plain(lv_obj_t *parent, uint32_t fill) {
+lv_obj_t *plain(lv_obj_t *parent, Rgb fill) {
   lv_obj_t *o = lv_obj_create(parent);
   lv_obj_remove_style_all(o);
   lv_obj_set_style_bg_color(o, col(fill), 0);
@@ -104,7 +107,7 @@ lv_obj_t *ground(lv_obj_t *parent, int w, int h) {
   return o;
 }
 
-lv_obj_t *words(lv_obj_t *parent, Font font, uint32_t color) {
+lv_obj_t *words(lv_obj_t *parent, Font font, Rgb color) {
   lv_obj_t *l = ui::label(parent, font, theme::INK);
   lv_obj_set_style_text_color(l, col(color), 0);
   return l;
@@ -170,11 +173,6 @@ class PrinterStatusTile : public tessera::Tile {
     for (auto &chip : chips_) {
       chip = words(root, Font::BODY, C_COOL);
       center(chip);
-      lv_obj_set_height(chip, chip_h);
-      lv_obj_set_style_pad_top(chip, ui::px(3), 0);
-      lv_obj_set_style_bg_color(chip, col(C_CHIP), 0);
-      lv_obj_set_style_bg_opa(chip, LV_OPA_COVER, 0);
-      lv_obj_set_style_radius(chip, ui::px(6), 0);
       show(chip, false);
     }
 
@@ -215,8 +213,9 @@ class PrinterStatusTile : public tessera::Tile {
     } else if (stacked) {
       with_job = rows >= 4;
       with_info = rows >= 2;
-      with_temps = rows >= 3;
+      with_temps = chips_on_ = chips_centered_ = rows >= 3;
       const int total = arc + gap + rows * (lh + gap);
+      chips_filled_ = total + chip_h - lh <= ih;
       y = pad + std::max(0, (ih - total) / 2);
       ring_at(pad + (iw - arc) / 2, y, arc);
       y += arc + 2 * gap;
@@ -226,13 +225,15 @@ class PrinterStatusTile : public tessera::Tile {
       ring_at(pad, pad + (ih - arc) / 2, arc);
       int total;
       if (3 * lh + chip_h + 3 * gap <= ih) {
-        with_job = with_info = with_temps = chips_on_ = true;
+        with_job = with_info = with_temps = chips_on_ = chips_filled_ = true;
         total = 3 * lh + chip_h + 3 * gap;
       } else if (3 * lh + 2 * gap <= ih) {
-        with_info = with_temps = true;
+        with_info = with_temps = chips_on_ = true;
+        job_inline_ = text_w_ >= ui::px(220);
         total = 3 * lh + 2 * gap;
       } else if (2 * lh + gap <= ih) {
         with_info = true;
+        job_inline_ = text_w_ >= ui::px(220);
         total = 2 * lh + gap;
       } else {
         total = lh;
@@ -241,8 +242,10 @@ class PrinterStatusTile : public tessera::Tile {
     }
 
     place(status_, text_x, y, text_w_);
+    status_x_ = text_x;
+    if (job_inline_) lv_obj_set_y(job_, y);
     y += lh + gap;
-    show(job_, with_job);
+    show(job_, with_job || job_inline_);
     if (with_job) {
       place(job_, text_x, y, text_w_);
       y += lh + gap;
@@ -258,6 +261,14 @@ class PrinterStatusTile : public tessera::Tile {
       chips_x_ = text_x;
       chips_y_ = y;
     }
+    if (chips_filled_)
+      for (auto *chip : chips_) {
+        lv_obj_set_height(chip, chip_h);
+        lv_obj_set_style_pad_top(chip, ui::px(3), 0);
+        lv_obj_set_style_bg_color(chip, col(C_CHIP), 0);
+        lv_obj_set_style_bg_opa(chip, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(chip, ui::px(6), 0);
+      }
 
     update();
   }
@@ -283,9 +294,9 @@ class PrinterStatusTile : public tessera::Tile {
   }
 
   void update() {
-    const State state = parse_state(plugin_->print_status);
+    const State state = parse_state(plugin_->value(STATUS));
     const lv_color_t tone = col(state_color(state));
-    const int progress = std::max(0, std::min(100, plugin_->progress_val));
+    const int progress = std::max(0, std::min(100, plugin_->whole(PROGRESS)));
 
     lv_arc_set_value(arc_, progress);
     lv_obj_set_style_arc_color(arc_, tone, LV_PART_INDICATOR);
@@ -293,15 +304,24 @@ class PrinterStatusTile : public tessera::Tile {
     snprintf(pct, sizeof(pct), "%d%%", progress);
     ui::set_text(pct_, pct);
 
-    ui::set_text(status_, plugin_->text(state_key(state)));
+    const std::string status = plugin_->text(state_key(state));
+    ui::set_text(status_, status);
     lv_obj_set_style_text_color(status_, tone, 0);
-    ui::set_text(job_, plugin_->job_name);
+    ui::set_text(job_, plugin_->value(JOB));
+    if (job_inline_ && status != status_shown_) {
+      // The job's name follows the status on its line.
+      status_shown_ = status;
+      const int taken = ui::text_width(status, Font::BODY) + ui::px(10);
+      lv_obj_set_width(status_, taken);
+      lv_obj_set_x(job_, status_x_ + taken);
+      lv_obj_set_width(job_, std::max(0, text_w_ - taken));
+    }
 
     const bool active = state == State::RUNNING || state == State::PAUSED || state == State::PREPARE;
     std::string layers, left;
-    if (active && plugin_->layer_val >= 0) {
-      layers = std::to_string(plugin_->layer_val);
-      if (plugin_->total_layers_val > 0) layers += "/" + std::to_string(plugin_->total_layers_val);
+    if (active && plugin_->whole(LAYER) >= 0) {
+      layers = std::to_string(plugin_->whole(LAYER));
+      if (plugin_->whole(TOTAL_LAYERS) > 0) layers += "/" + std::to_string(plugin_->whole(TOTAL_LAYERS));
     }
     const int minutes = plugin_->remaining_minutes();
     if (active && minutes > 0) left = format_minutes(minutes);
@@ -316,13 +336,13 @@ class PrinterStatusTile : public tessera::Tile {
     info[2] = left.empty() ? layers : left;
     ui::set_text(info_, fitting(info, 3, text_w_));
 
-    const std::string n = format_temp(plugin_->nozzle_temp), b = format_temp(plugin_->bed_temp),
-                      c = format_temp(plugin_->chamber_temp);
+    const std::string raw[3] = {plugin_->value(NOZZLE), plugin_->value(BED), plugin_->value(CHAMBER)};
+    const std::string n = format_temp(raw[0]), b = format_temp(raw[1]), c = format_temp(raw[2]);
     const std::string signature = n + b + c;
     if (signature == temps_shown_) return;
     temps_shown_ = signature;
 
-    if (chips_on_ && lay_chips(n, b, c)) {
+    if (chips_on_ && lay_chips(raw, n, b, c)) {
       show(temps_, false);
       return;
     }
@@ -337,27 +357,29 @@ class PrinterStatusTile : public tessera::Tile {
   }
 
   // The temperatures as three chips, with their names when the row has room for them. False when not even the values fit.
-  bool lay_chips(const std::string &n, const std::string &b, const std::string &c) {
+  bool lay_chips(const std::string *raw, const std::string &n, const std::string &b, const std::string &c) {
     const std::string values[3] = {n, b, c};
     const char *keys[3] = {"nozzle", "bed", "chamber"};
-    const std::string *raw[3] = {&plugin_->nozzle_temp, &plugin_->bed_temp, &plugin_->chamber_temp};
-    const int inner = ui::px(7), between = ui::px(6);
+    const int inner = chips_filled_ ? ui::px(7) : 0, between = chips_filled_ ? ui::px(6) : ui::px(10);
     std::string texts[3];
     int widths[3];
-    for (int named = 1; named >= 0; named--) {
-      int total = 2 * between;
-      for (int i = 0; i < 3; i++) {
-        texts[i] = named ? std::string(plugin_->text(keys[i])) + " " + values[i] : values[i];
-        widths[i] = ui::text_width(texts[i], Font::BODY) + 2 * inner;
+    // With their names, then the values alone, then without the chamber.
+    for (int attempt = 0; attempt < 3; attempt++) {
+      const int count = attempt == 2 ? 2 : 3;
+      int total = (count - 1) * between;
+      for (int i = 0; i < count; i++) {
+        texts[i] = attempt == 0 ? std::string(plugin_->text(keys[i])) + " " + values[i] : values[i];
+        widths[i] = ui::text_width(texts[i], Font::BODY) + 2 * inner + ui::px(2);
         total += widths[i];
       }
       if (total > text_w_) continue;
-      int x = chips_x_;
+      int x = chips_x_ + (chips_centered_ ? (text_w_ - total) / 2 : 0);
       for (int i = 0; i < 3; i++) {
+        show(chips_[i], i < count);
+        if (i >= count) continue;
         ui::set_text(chips_[i], texts[i]);
-        lv_obj_set_style_text_color(chips_[i], col(temp_color(*raw[i])), 0);
+        lv_obj_set_style_text_color(chips_[i], col(temp_color(raw[i])), 0);
         place(chips_[i], x, chips_y_, widths[i]);
-        show(chips_[i], true);
         x += widths[i] + between;
       }
       return true;
@@ -366,9 +388,9 @@ class PrinterStatusTile : public tessera::Tile {
   }
 
   BambulabX1C *plugin_;
-  int text_w_{0}, chips_x_{0}, chips_y_{0};
-  bool chips_on_{false};
-  std::string temps_shown_{"?"};
+  int text_w_{0}, status_x_{0}, chips_x_{0}, chips_y_{0};
+  bool chips_on_{false}, chips_filled_{false}, chips_centered_{false}, job_inline_{false};
+  std::string temps_shown_{"?"}, status_shown_{"?"};
 
   lv_obj_t *arc_{};
   lv_obj_t *pct_{};
@@ -427,10 +449,10 @@ class PrinterTempsTile : public tessera::Tile {
 
  private:
   void update() {
-    const std::string *raw[3] = {&plugin_->nozzle_temp, &plugin_->bed_temp, &plugin_->chamber_temp};
+    const std::string raw[3] = {plugin_->value(NOZZLE), plugin_->value(BED), plugin_->value(CHAMBER)};
     for (int i = 0; i < 3; i++) {
-      ui::set_text(values_[i], format_temp(*raw[i]));
-      lv_obj_set_style_text_color(values_[i], col(temp_color(*raw[i])), 0);
+      ui::set_text(values_[i], format_temp(raw[i]));
+      lv_obj_set_style_text_color(values_[i], col(temp_color(raw[i])), 0);
     }
   }
 
@@ -441,17 +463,6 @@ class PrinterTempsTile : public tessera::Tile {
 // ─── Plugin setup ──────────────────────────────────────────────────────────
 
 void BambulabX1C::setup() {
-  subscribe_homeassistant_state(&BambulabX1C::on_print_status,   prefix_ + "_druckstatus");
-  subscribe_homeassistant_state(&BambulabX1C::on_progress,       prefix_ + "_druckfortschritt");
-  subscribe_homeassistant_state(&BambulabX1C::on_layer,          prefix_ + "_aktuelle_schicht");
-  subscribe_homeassistant_state(&BambulabX1C::on_total_layers,   prefix_ + "_gesamtzahl_der_schichten");
-  subscribe_homeassistant_state(&BambulabX1C::on_time_remaining, prefix_ + "_verbleibende_zeit");
-  subscribe_homeassistant_state(&BambulabX1C::on_time_unit,      prefix_ + "_verbleibende_zeit", "unit_of_measurement");
-  subscribe_homeassistant_state(&BambulabX1C::on_job_name,       prefix_ + "_name_der_aufgabe");
-  subscribe_homeassistant_state(&BambulabX1C::on_nozzle,         prefix_ + "_temperatur_der_duse");
-  subscribe_homeassistant_state(&BambulabX1C::on_bed,            prefix_ + "_druckbetttemperatur");
-  subscribe_homeassistant_state(&BambulabX1C::on_chamber,        prefix_ + "_temperatur_im_druckraum");
-
   add_tile("printer_status", [this]() { return new PrinterStatusTile(this); });
   add_tile("printer_temps",  [this]() { return new PrinterTempsTile(this); });
 }
