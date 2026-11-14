@@ -1,3 +1,9 @@
+## 0.4.2 - 2026-11-14
+
+- A finished print still shows its layer count, so the middle line of the status tile is no longer empty.
+- On wide tiles the temperatures sit on their own chips again, as in the design concept.
+- A slimmer progress ring.
+
 ## 0.4.1 - 2026-11-14
 
 - Sensors are now read through ESPHome text sensors declared in plugin.yaml, so the tiles get their values on the screen.

@@ -150,7 +150,8 @@ class PrinterStatusTile : public tessera::Tile {
     const int gap = ui::px(4);
     const int pad = std::min(w, h) < ui::px(110) ? ui::px(6) : ui::px(12);
     const int iw = w - 2 * pad, ih = h - 2 * pad;
-    const int chip_h = lh + 2 * ui::px(3);
+    int chip_pad = ui::px(3);
+    int chip_h = lh + 2 * chip_pad;
 
     arc_ = lv_arc_create(root);
     lv_obj_remove_style(arc_, nullptr, LV_PART_KNOB);
@@ -231,6 +232,13 @@ class PrinterStatusTile : public tessera::Tile {
         with_info = with_temps = chips_on_ = true;
         job_inline_ = text_w_ >= ui::px(220);
         total = 3 * lh + 2 * gap;
+        // Slim chips with a ground of their own, when two pixels more still fit.
+        if (total + 2 * ui::px(1) <= ih) {
+          chips_filled_ = true;
+          chip_pad = ui::px(1);
+          chip_h = lh + 2 * chip_pad;
+          total += 2 * chip_pad;
+        }
       } else if (2 * lh + gap <= ih) {
         with_info = true;
         job_inline_ = text_w_ >= ui::px(220);
@@ -264,7 +272,7 @@ class PrinterStatusTile : public tessera::Tile {
     if (chips_filled_)
       for (auto *chip : chips_) {
         lv_obj_set_height(chip, chip_h);
-        lv_obj_set_style_pad_top(chip, ui::px(3), 0);
+        lv_obj_set_style_pad_top(chip, chip_pad, 0);
         lv_obj_set_style_bg_color(chip, col(C_CHIP), 0);
         lv_obj_set_style_bg_opa(chip, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(chip, ui::px(6), 0);
@@ -277,7 +285,7 @@ class PrinterStatusTile : public tessera::Tile {
 
  private:
   void ring_at(int x, int y, int size) {
-    const int stroke = std::max(ui::px(5), std::min(ui::px(12), size / 10));
+    const int stroke = std::max(ui::px(4), std::min(ui::px(10), size / 12));
     lv_obj_set_pos(arc_, x, y);
     lv_obj_set_size(arc_, size, size);
     lv_obj_set_style_arc_width(arc_, stroke, LV_PART_MAIN);
@@ -319,7 +327,7 @@ class PrinterStatusTile : public tessera::Tile {
 
     const bool active = state == State::RUNNING || state == State::PAUSED || state == State::PREPARE;
     std::string layers, left;
-    if (active && plugin_->whole(LAYER) >= 0) {
+    if ((active || state == State::FINISHED) && plugin_->whole(LAYER) >= 0) {
       layers = std::to_string(plugin_->whole(LAYER));
       if (plugin_->whole(TOTAL_LAYERS) > 0) layers += "/" + std::to_string(plugin_->whole(TOTAL_LAYERS));
     }
