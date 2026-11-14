@@ -410,7 +410,8 @@ class PrinterStatusTile : public tessera::Tile {
 };
 
 // ─── PrinterTempsTile ──────────────────────────────────────────────────────
-// Three rows, the name on the left and the temperature on the right, warm values in orange.
+// Three rows, the name on the left and the temperature on the right, warm values in orange. On a tile too low for
+// that, one row with the three values side by side.
 
 class PrinterTempsTile : public tessera::Tile {
  public:
@@ -427,6 +428,13 @@ class PrinterTempsTile : public tessera::Tile {
     const bool header = ih >= lb + ui::px(6) + 3 * (lt + ui::px(6));
     const int top = pad + (header ? lb + ui::px(6) : 0);
     const int row = (pad + ih - top) / 3;
+
+    // Too low for three rows one above the other: the values go side by side in a single row instead.
+    if (row < lb + ui::px(2)) {
+      create_compact(root, pad, iw, ih);
+      update();
+      return;
+    }
     const Font value_font = lt <= row ? Font::TITLE : Font::BODY;
     const int lv = ui::line_height(value_font);
 
@@ -456,15 +464,60 @@ class PrinterTempsTile : public tessera::Tile {
   void on_tick(uint32_t) override { update(); }
 
  private:
+  // First character (UTF-8 aware) of a name, for the shortest labelled form.
+  static std::string initial(const std::string &s) {
+    if (s.empty()) return s;
+    size_t n = 1;
+    while (n < s.size() && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80) n++;
+    return s.substr(0, n);
+  }
+
+  // One row of up to three columns, centred in the tile: "Name 221°", else "N 221°", else the bare value (in its
+  // colour); when even three bare values do not fit, the chamber is left out.
+  void create_compact(lv_obj_t *root, int pad, int iw, int ih) {
+    compact_ = true;
+    const char *keys[3] = {"nozzle", "bed", "chamber"};
+    const std::string sample = "888°";
+    int mode = 2, count = 3;
+    for (int attempt = 0; attempt < 4; attempt++) {
+      const int cols = attempt == 3 ? 2 : 3;
+      int widest = 0;
+      for (int i = 0; i < cols; i++) {
+        const std::string name = plugin_->text(keys[i]);
+        const std::string t = attempt == 0 ? name + " " + sample : attempt == 1 ? initial(name) + " " + sample : sample;
+        widest = std::max(widest, ui::text_width(t, Font::BODY));
+      }
+      mode = attempt == 3 ? 2 : attempt;
+      count = cols;
+      if (widest <= iw / cols) break;
+    }
+    const int lb = ui::line_height(Font::BODY);
+    const int colw = iw / count;
+    count_ = count;
+    for (int i = 0; i < 3; i++) {
+      prefix_[i] = mode == 0 ? std::string(plugin_->text(keys[i])) + " "
+                 : mode == 1 ? initial(plugin_->text(keys[i])) + " "
+                             : "";
+      values_[i] = words(root, Font::BODY, C_COOL);
+      center(values_[i]);
+      show(values_[i], i < count);
+      place(values_[i], pad + i * colw, pad + (ih - lb) / 2, colw);
+    }
+  }
+
   void update() {
     const std::string raw[3] = {plugin_->value(NOZZLE), plugin_->value(BED), plugin_->value(CHAMBER)};
     for (int i = 0; i < 3; i++) {
-      ui::set_text(values_[i], format_temp(raw[i]));
+      if (compact_ && i >= count_) continue;
+      ui::set_text(values_[i], (compact_ ? prefix_[i] : std::string()) + format_temp(raw[i]));
       lv_obj_set_style_text_color(values_[i], col(temp_color(raw[i])), 0);
     }
   }
 
   BambulabX1C *plugin_;
+  bool compact_{false};
+  int count_{3};
+  std::string prefix_[3];
   lv_obj_t *values_[3]{};
 };
 

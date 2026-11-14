@@ -1,3 +1,7 @@
+## 0.4.3 - 2026-11-14
+
+- The temperature tile no longer overlaps on very low tiles (1×1 and 2×1 on the 2.8" screen): the three values now sit side by side in one row, with short names when they fit, otherwise just the coloured values.
+
 ## 0.4.2 - 2026-11-14
 
 - A finished print still shows its layer count, so the middle line of the status tile is no longer empty.
